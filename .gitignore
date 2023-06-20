@@ -1,0 +1,6 @@
+dev.ipynb
+output/
+checkpoint/
+*.log
+__pycache__
+*.DS_Store
