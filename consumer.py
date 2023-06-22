@@ -3,6 +3,7 @@ from pyspark.sql import SparkSession
 from pyspark.sql.functions import split
 from transformation import split_columns
 
+
 def main(kafka_bootstrap_servers, kafka_topic):
     # Set up Spark session
     spark = SparkSession.builder.appName("KafkaSparkStreaming")\
@@ -36,10 +37,13 @@ def main(kafka_bootstrap_servers, kafka_topic):
     # Wait for the query to terminate
     query.awaitTermination()
 
+
 if __name__ == "__main__":
     parser = argparse.ArgumentParser(description="Kafka Spark Streaming")
-    parser.add_argument("--bootstrap-servers", type=str, default="localhost:9092", help="Kafka bootstrap servers")
-    parser.add_argument("--topic", type=str, default="kafka_test", help="Kafka topic name")
+    parser.add_argument("--bootstrap-servers", type=str,
+                        default="localhost:9092", help="Kafka bootstrap servers")
+    parser.add_argument("--topic", type=str,
+                        default="kafka_test", help="Kafka topic name")
     args = parser.parse_args()
 
-    main(args.servers, args.topic)
+    main(args.bootstrap_servers, args.topic)
