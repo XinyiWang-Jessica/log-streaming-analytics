@@ -4,6 +4,17 @@ from pyspark.sql.functions import split
 from transformation import split_columns
 
 
+def transfer(input_df):
+    # split columns
+    df = split_to_df(input_df, ts_pattern2)
+    # check missing values
+    if count_null(df) > 0:
+        print('Found missing values')
+    # format timestamp
+    df = format_timestamp(df)
+    error_by_day = error_count_by_day(df)
+    return error_by_day
+
 def main(kafka_bootstrap_servers, kafka_topic):
     # Set up Spark session
     spark = SparkSession.builder.appName("KafkaSparkStreaming")\
@@ -22,7 +33,7 @@ def main(kafka_bootstrap_servers, kafka_topic):
     df = df.selectExpr("CAST(value AS STRING)")
 
     # Transform the dataframe
-    df = split_columns(df)
+    df = transfer(df)
 
     # Start the streaming query and write the data to a text file
     query = df.writeStream \
