@@ -8,12 +8,19 @@ def transfer(input_df):
     # split columns
     df = split_to_df(input_df, ts_pattern2)
     # check missing values
-    if count_null(df) > 0:
-        print('Found missing values')
+    # if count_null(df) > 0:
+    #     print('Found missing values')
     # format timestamp
     df = format_timestamp(df)
-    error_by_day = error_count_by_day(df)
-    return error_by_day
+    df_404 = (df.filter(df['status'] == 404))
+    status_day_df = df_404.select(df.endpoint, df.time,
+                             F.dayofweek('time').alias('weekday'))
+    status_freq_df = (status_day_df
+                     .withWatermark("time", "1 minutes")
+                     .groupBy('weekday', 'time')
+                     .count())
+    # error_by_day = error_count_by_day(df)
+    return status_freq_df
 
 def main(kafka_bootstrap_servers, kafka_topic):
     # Set up Spark session
