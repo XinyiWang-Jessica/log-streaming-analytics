@@ -48,15 +48,15 @@ def split_to_df(df, ts_pattern):
                          regexp_extract('value', content_size_pattern, 1).cast('integer').alias('content_size'))
     return logs_df
 
-# def count_null(col_name):
-#     return spark_sum(col(col_name).isNull().cast('integer')).alias(col_name)
+def count_null(col_name):
+    return spark_sum(col(col_name).isNull().cast('integer')).alias(col_name)
 
-def count_null_col(df):
+def count_null_cols(df):
     """
-    count the number of null values for each column
+    Count the number of null values for each column.
     """
     col = df.columns
-    exprs = [count_null(col_name) for col_name in col]
+    exprs = [count_null_col(col_name) for col_name in col]
     return df.agg(*exprs)
 
 
