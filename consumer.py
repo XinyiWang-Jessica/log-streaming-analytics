@@ -1,26 +1,20 @@
+import os
+import shutil 
 import argparse
 from pyspark.sql import SparkSession
-from pyspark.sql.functions import split
-from transformation import split_columns
+from transformation import *
 
 
-def transfer(input_df):
-    # split columns
-    df = split_to_df(input_df, ts_pattern2)
-    # check missing values
-    # if count_null(df) > 0:
-    #     print('Found missing values')
-    # format timestamp
-    df = format_timestamp(df)
-    df_404 = (df.filter(df['status'] == 404))
-    status_day_df = df_404.select(df.endpoint, df.time,
-                             F.dayofweek('time').alias('weekday'))
-    status_freq_df = (status_day_df
-                     .withWatermark("time", "1 minutes")
-                     .groupBy('weekday', 'time')
-                     .count())
-    # error_by_day = error_count_by_day(df)
-    return status_freq_df
+def batch_processing(df, id):
+    """Apply transformation on each batch of streaming data, and save to disk."""
+
+    # First operation: count # of 404 requests by weekday
+    df_404 = weekday_404_count(df)
+    df_404.coalesce(1).write.format('csv') \
+        .option("header", True) \
+        .mode("append") \
+        .save("output/weekday_404_count", header=True)
+
 
 def main(kafka_bootstrap_servers, kafka_topic):
     # Set up Spark session
@@ -28,6 +22,7 @@ def main(kafka_bootstrap_servers, kafka_topic):
         .config("spark.sql.streaming.checkpointLocation", "checkpoint")\
         .getOrCreate()
 
+    # Read streaming data from Kafka topic
     df = spark \
         .readStream \
         .format("kafka") \
@@ -36,25 +31,33 @@ def main(kafka_bootstrap_servers, kafka_topic):
         .option("startingOffsets", "earliest") \
         .load()
 
-    # Select only the `value` column
-    df = df.selectExpr("CAST(value AS STRING)")
-
-    # Transform the dataframe
-    df = transfer(df)
+    # Preprocess incoming data
+    df = proprocess_streaming_input(df)
 
     # Start the streaming query and write the data to a text file
-    query = df.writeStream \
-        .format("csv") \
-        .option("header", "true") \
-        .outputMode("append") \
+    query = df.coalesce(1) \
+        .writeStream \
         .option("checkpointLocation", "checkpoint") \
-        .option("path", "output") \
-        .outputMode("append") \
+        .trigger(processingTime='10 seconds') \
+        .foreachBatch(batch_processing) \
         .start()
 
     # Wait for the query to terminate
     query.awaitTermination()
 
+
+def reset_checkpoint_output():
+    script_dir = os.path.dirname(os.path.abspath(__file__))
+    output_dir = os.path.join(script_dir, 'output')
+    checkpoint_dir = os.path.join(script_dir, 'checkpoint')
+
+    # Remove the output dir if it exists
+    if os.path.exists(output_dir):
+        shutil.rmtree(output_dir)
+
+    # Remove the checkpoint dir if it exists
+    if os.path.exists(checkpoint_dir):
+        shutil.rmtree(checkpoint_dir)
 
 if __name__ == "__main__":
     parser = argparse.ArgumentParser(description="Kafka Spark Streaming")
@@ -62,6 +65,11 @@ if __name__ == "__main__":
                         default="localhost:9092", help="Kafka bootstrap servers")
     parser.add_argument("--topic", type=str,
                         default="kafka_test", help="Kafka topic name")
+    parser.add_argument("--reset", action=argparse.BooleanOptionalAction,
+                        default=False, help="Clean up Spark checkpoint and output before consuming new data.")
     args = parser.parse_args()
+
+    if args.reset:
+        reset_checkpoint_output()
 
     main(args.bootstrap_servers, args.topic)

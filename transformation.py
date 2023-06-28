@@ -1,14 +1,9 @@
-from pyspark.sql.functions import split
-
 from definitions import *
 import glob
-from pyspark.sql.functions import regexp_extract
-from pyspark.sql.functions import col
+from pyspark.sql.functions import split, regexp_extract, col, udf
 from pyspark.sql.functions import sum as spark_sum
-from pyspark.sql.functions import udf
 from pyspark.sql import functions as F
 from pyspark.sql.window import Window
-
 import matplotlib.pyplot as plt
 import numpy as np
 import seaborn as sns
@@ -22,18 +17,6 @@ def zip_log_to_df(input_file_path, spark):
     # base_df_rdd = base_df.rdd
     return base_df
 
-def split_columns(df):
-    """Split raw log records into different columns."""
-    transformed_df = df.withColumn("value", split(df["value"], " ")) \
-        .selectExpr("value[0] AS IP",
-                    "substring(value[3], 2, length(value[3])) AS Date",
-                    "substring(value[4], 1, length(value[4])-1) AS Time",
-                    "substring(value[5], 2, length(value[5])) AS Method",
-                    "value[6] AS Endpoint",
-                    "substring(value[7], 1, length(value[7])-1) AS Protocol",
-                    "value[8] AS Status",
-                    "value[9] AS Size")
-    return transformed_df
 
 def split_to_df(df, ts_pattern):
     """
@@ -113,7 +96,6 @@ def format_timestamp(df):
     """
     format timestamp string to timestamp
     """
-    udf_parse_time = udf(parse_clf_time)
     df = df.select('*',
             df['timestamp'].cast('timestamp').alias('time')).drop('timestamp')
     return df
@@ -231,3 +213,19 @@ def error_count_by_day(df):
     udf_parse_day = udf(parse_day_of_week)
     result = status_freq_df.select('*', udf_parse_day(status_freq_df['weekday']).alias('Day in a week')).drop('weekday')
     return result
+
+
+def proprocess_streaming_input(df):
+    """Preprocess streaming dataframe into columnar format"""
+    df = df.selectExpr("CAST(value AS STRING)")
+    df = split_to_df(df, ts_pattern2)
+    df = format_timestamp(df)
+    return df
+
+def weekday_404_count(df):
+    df_404 = df.filter(df['status'] == 404) \
+        .select(df.endpoint, df.time, F.dayofweek('time').alias('weekday')) \
+        .groupBy('weekday') \
+        .count()
+    return df_404
+

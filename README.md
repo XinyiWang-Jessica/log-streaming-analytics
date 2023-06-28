@@ -12,6 +12,7 @@ Arguments:
 - `--topic`: Kafka topic to publish the data to. Default is `kafka_test`.
 - `--file`: Path to the log file to be injected into Kafka. Default is `40MBFile.log`.
 - `--limit`: Limit the number of log record to be injected. Default is -1, which will inject all lines.
+- `--reset`: Clean up Kafka topic before producing new messages. Default is `False`.
 
 
 `consumer.py` - script to read & process Kafka streaming data
@@ -20,6 +21,7 @@ Arguments:
 
 - `--bootstrap-servers`: Kafka bootstrap servers. Default is `localhost:9092`.
 - `--topic`: Kafka topic to listen to. Default is `kafka_test`.
+- `--reset`: Clean up previous Spark checkpoint and output before consuming new data. Default is `False`.
 
 
 `transformation.py` - contains helper functions for wrangling Spark streaming dataframes
