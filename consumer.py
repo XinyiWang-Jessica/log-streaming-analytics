@@ -7,13 +7,29 @@ from transformation import *
 
 def batch_processing(df, id):
     """Apply transformation on each batch of streaming data, and save to disk."""
-
     # First operation: count # of 404 requests by weekday
-    df_404 = weekday_404_count(df)
-    df_404.coalesce(1).write.format('csv') \
+    df_null = count_null_cols(df)
+    df_content = content_stat(df)
+    df_404 = table_404(df)
+    df_status = status_count(df)
+    df_host = host_count(df)
+    df_endpoint = endpoint_count(df)
+    df_unique_host_count = monthday_unique_host_count(df)
+    df_daily_request_count= request_count(df)
+    eda_list = [("null_value_count", df_null),
+                ("Content_stats", df_content),
+                ("Table_404", df_404), 
+                ("status_count", df_status),
+                ("host_count", df_host),
+                ("endpoint_count", df_endpoint),
+                ("unique_host_count", df_unique_host_count),
+                ("daily_request_count", df_daily_request_count)
+                ]
+    for name, eda_df in eda_list:
+        eda_df.coalesce(1).write.format('csv') \
         .option("header", True) \
         .mode("append") \
-        .save("output/weekday_404_count", header=True)
+        .save("output/" + name, header=True)
 
 
 def main(kafka_bootstrap_servers, kafka_topic):
@@ -65,11 +81,12 @@ if __name__ == "__main__":
                         default="localhost:9092", help="Kafka bootstrap servers")
     parser.add_argument("--topic", type=str,
                         default="kafka_test", help="Kafka topic name")
-    parser.add_argument("--reset", action=argparse.BooleanOptionalAction,
-                        default=False, help="Clean up Spark checkpoint and output before consuming new data.")
+    # parser.add_argument("--reset", action=argparse.BooleanOptionalAction,
+    #                     default=False, help="Clean up Spark checkpoint and output before consuming new data.")
     args = parser.parse_args()
 
-    if args.reset:
+    # if args.reset:
+    if True:
         reset_checkpoint_output()
 
     main(args.bootstrap_servers, args.topic)

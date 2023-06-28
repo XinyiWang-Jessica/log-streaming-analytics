@@ -154,3 +154,19 @@ def top_endpoint_by_day(df):
     result = result.select('*', udf_parse_day(result['weekday']).alias('Day in a week')).drop('weekday')
     return result
 
+def error_count_by_day(df):
+    '''
+    filter the records with 404 status
+    aggregated by the day of week
+    '''
+    df_404 = (df.filter(df['status'] == 404))
+    status_day_df = df_404.select(df.endpoint, 
+                             F.dayofweek('time').alias('weekday'))
+    # group by weekday and the endpoint, aggregate by counts
+    status_freq_df = (status_day_df
+                     .groupBy('weekday')
+                     .count()
+                     .sort("weekday"))
+    udf_parse_day = udf(parse_day_of_week)
+    result = status_freq_df.select('*', udf_parse_day(status_freq_df['weekday']).alias('Day in a week')).drop('weekday')
+    return result

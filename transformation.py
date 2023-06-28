@@ -4,9 +4,9 @@ from pyspark.sql.functions import split, regexp_extract, col, udf
 from pyspark.sql.functions import sum as spark_sum
 from pyspark.sql import functions as F
 from pyspark.sql.window import Window
-import matplotlib.pyplot as plt
-import numpy as np
-import seaborn as sns
+# import matplotlib.pyplot as plt
+# import numpy as np
+# import seaborn as sns
 
 def zip_log_to_df(input_file_path, spark):
     # read .gz files in the given directory
@@ -31,7 +31,7 @@ def split_to_df(df, ts_pattern):
                          regexp_extract('value', content_size_pattern, 1).cast('integer').alias('content_size'))
     return logs_df
 
-def count_null(col_name):
+def count_null_col(col_name):
     return spark_sum(col(col_name).isNull().cast('integer')).alias(col_name)
 
 def count_null_cols(df):
@@ -101,42 +101,6 @@ def format_timestamp(df):
     return df
 
 
-def plot_status(df):
-    """
-    bar plot for status distribution
-    """
-    status_freq_df = (df
-                     .groupBy('status')
-                     .count()
-                     .sort('status')
-                     .cache())
-    status_freq_pd_df = (status_freq_df
-                         .toPandas()
-                         .sort_values(by=['count'],
-                                      ascending=False))
-    sns.catplot(x='status', y='count', data=status_freq_pd_df, 
-            kind='bar', order=status_freq_pd_df['status'])
-    return status_freq_df
-
-
-def plot_log_status(df):
-    """
-    bar plot for status distribution in log scale
-    """
-    status_freq_df = (df
-                     .groupBy('status')
-                     .count()
-                     .sort('status')
-                     .cache())
-    log_freq_df = status_freq_df.withColumn('log(count)', F.log(status_freq_df['count']))
-    log_freq_pd_df = (log_freq_df
-                         .toPandas()
-                         .sort_values(by=['log(count)'],
-                                      ascending=False))
-    sns.catplot(x='status', y='log(count)', data=log_freq_pd_df, 
-            kind='bar', order=log_freq_pd_df['status'])
-    return status_freq_df
-
 def top_host(df, n):
     """
     get the top n host
@@ -197,23 +161,6 @@ def top_endpoint_by_day(df):
     result = result.select('*', udf_parse_day(result['weekday']).alias('Day in a week')).drop('weekday')
     return result
 
-def error_count_by_day(df):
-    '''
-    filter the records with 404 status
-    aggregated by the day of week
-    '''
-    df_404 = (df.filter(df['status'] == 404))
-    status_day_df = df_404.select(df.endpoint, 
-                             F.dayofweek('time').alias('weekday'))
-    # group by weekday and the endpoint, aggregate by counts
-    status_freq_df = (status_day_df
-                     .groupBy('weekday')
-                     .count()
-                     .sort("weekday"))
-    udf_parse_day = udf(parse_day_of_week)
-    result = status_freq_df.select('*', udf_parse_day(status_freq_df['weekday']).alias('Day in a week')).drop('weekday')
-    return result
-
 
 def proprocess_streaming_input(df):
     """Preprocess streaming dataframe into columnar format"""
@@ -222,10 +169,65 @@ def proprocess_streaming_input(df):
     df = format_timestamp(df)
     return df
 
-def weekday_404_count(df):
-    df_404 = df.filter(df['status'] == 404) \
-        .select(df.endpoint, df.time, F.dayofweek('time').alias('weekday')) \
-        .groupBy('weekday') \
-        .count()
-    return df_404
+def content_stat(df):
+    df_content =  (df.agg(F.min(df['content_size']).alias('min_content_size'),
+             F.max(df['content_size']).alias('max_content_size'),
+             F.mean(df['content_size']).alias('mean_content_size'),
+             F.stddev(df['content_size']).alias('std_content_size'),
+             F.count(df['content_size']).alias('count_content_size')))
+    return df_content
 
+def table_404(df):
+    """Filter the records with 404 status"""
+    df_404 = df.filter(df['status'] == 404) \
+        .select(df.endpoint, F.dayofweek('time').alias('weekday')) 
+    udf_parse_day = udf(parse_day_of_week)
+    result = df_404.select('*', udf_parse_day(df_404['weekday']).alias('Day in a week')).drop('weekday')
+    return result
+
+def status_count(df):
+    """get the count for each status group"""
+    status_freq_df = (df
+                     .groupBy('status')
+                     .count())
+    return status_freq_df
+
+def host_count(df):
+    """
+    get the count for each host
+    """
+    host_sum_df =(df
+               .groupBy('host')
+               .count()
+            #    .sort('count', ascending=False).limit(n)
+               )
+    return host_sum_df
+
+def endpoint_count(df):
+    """
+    get the count for each endpoints
+    """
+    endpoint_sum_df =(df
+               .groupBy('endpoint')
+               .count()
+            #    .sort('count', ascending=False).limit(n)
+               )
+    return endpoint_sum_df
+
+def monthday_unique_host_count(df):
+    """ get the count of unique host for each day of month"""
+    # get the month of day
+    host_day_df = df.select(df.host, F.dayofmonth('time').alias('day'))\
+        .dropDuplicates() \
+        .groupBy('day') \
+        .count()
+    return host_day_df
+
+
+def request_count(df):
+    """ get the count of request for each day of month"""
+    # get the month of day
+    day_df = df.select(df.host, F.dayofmonth('time').alias('day'))\
+        .groupBy('day') \
+        .count()
+    return day_df
