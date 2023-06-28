@@ -1,35 +1,31 @@
 import os
-import shutil 
+import shutil
 import argparse
 from pyspark.sql import SparkSession
 from transformation import *
+from definitions import HDFS_PATH
 
 
 def batch_processing(df, id):
     """Apply transformation on each batch of streaming data, and save to disk."""
-    # First operation: count # of 404 requests by weekday
-    df_null = count_null_cols(df)
-    df_content = content_stat(df)
-    df_404 = table_404(df)
-    df_status = status_count(df)
-    df_host = host_count(df)
-    df_endpoint = endpoint_count(df)
-    df_unique_host_count = monthday_unique_host_count(df)
-    df_daily_request_count= request_count(df)
-    eda_list = [("null_value_count", df_null),
-                ("Content_stats", df_content),
-                ("Table_404", df_404), 
-                ("status_count", df_status),
-                ("host_count", df_host),
-                ("endpoint_count", df_endpoint),
-                ("unique_host_count", df_unique_host_count),
-                ("daily_request_count", df_daily_request_count)
-                ]
-    for name, eda_df in eda_list:
-        eda_df.coalesce(1).write.format('csv') \
-        .option("header", True) \
-        .mode("append") \
-        .save("output/" + name, header=True)
+
+    # Define a mapping of name to transformation functions
+    transformation_map = {
+        "null_value_count": count_null_cols,
+        "content_stats": content_stat,
+        "table_404": table_404,
+        "status_count": status_count,
+        "host_count": host_count,
+        "endpoint_count": endpoint_count,
+        "unique_host_count": monthday_unique_host_count,
+        "daily_request_count": request_count
+    }
+    
+    # Process and save each DataFrame one by one
+    for name, transform_func in transformation_map.items():
+        eda_df = transform_func(df)
+        eda_df.coalesce(1).write.mode("append")\
+            .parquet(os.path.join(HDFS_PATH, name))
 
 
 def main(kafka_bootstrap_servers, kafka_topic):
@@ -75,18 +71,19 @@ def reset_checkpoint_output():
     if os.path.exists(checkpoint_dir):
         shutil.rmtree(checkpoint_dir)
 
+
 if __name__ == "__main__":
     parser = argparse.ArgumentParser(description="Kafka Spark Streaming")
     parser.add_argument("--bootstrap-servers", type=str,
                         default="localhost:9092", help="Kafka bootstrap servers")
     parser.add_argument("--topic", type=str,
                         default="kafka_test", help="Kafka topic name")
-    # parser.add_argument("--reset", action=argparse.BooleanOptionalAction,
-    #                     default=False, help="Clean up Spark checkpoint and output before consuming new data.")
+    parser.add_argument("--reset", action=argparse.BooleanOptionalAction,
+                        default=False, help="Clean up Spark checkpoint and output before consuming new data.")
     args = parser.parse_args()
 
     # if args.reset:
-    if True:
+    if args.reset:
         reset_checkpoint_output()
 
     main(args.bootstrap_servers, args.topic)
