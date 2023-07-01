@@ -180,10 +180,13 @@ def content_stat(df):
 def table_404(df):
     """Filter the records with 404 status"""
     df_404 = df.filter(df['status'] == 404) \
-        .select(df.endpoint, F.dayofweek('time').alias('weekday')) 
-    udf_parse_day = udf(parse_day_of_week)
-    result = df_404.select('*', udf_parse_day(df_404['weekday']).alias('Day in a week')).drop('weekday')
-    return result
+        .select(df.endpoint, df.host, 
+                F.dayofweek('time').alias('day in week'), 
+                F.dayofmonth('time').alias('day in month'),
+                F.hour('time').alias('hour')) 
+    # udf_parse_day = udf(parse_day_of_week)
+    # result = df_404.select('*', udf_parse_day(df_404['weekday']).alias('Day in a week')).drop('weekday')
+    return df_404
 
 def status_count(df):
     """get the count for each status group"""
@@ -207,9 +210,9 @@ def endpoint_count(df):
     """
     get the count for each endpoints
     """
-    endpoint_sum_df =(df
-               .groupBy('endpoint')
-               .count()
+    endpoint_sum_df =(df.select(df.endpoint, F.dayofweek('time').alias('weekday'))
+                    .groupBy(['endpoint', 'weekday'])
+                    .count()
             #    .sort('count', ascending=False).limit(n)
                )
     return endpoint_sum_df
