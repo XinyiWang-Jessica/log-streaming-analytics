@@ -34,13 +34,13 @@ Multiple aggregation and filtration operations are applied to each batch of stre
 
 These intermediate DataFrame outputs can then be combined together to perform further exploratory data analysis. By saving the intermediate outputs, it becomes possible to reuse the aggregated data without reprocessing the entire streaming dataset, thus improving efficiency and reducing computational overhead.
 
-The NASA_log_analysis notebook is an example of the EDA on real-world production log data from NASA. The dataset is available on the website
+The NASA_log_analysis notebook is an example of the EDA on real-world production log data from NASA. The dataset is available on the website:
 [NASA HTTP](https://ita.ee.lbl.gov/html/contrib/NASA-HTTP.html)
 
 ## Data Storage
 The transformed data is then converted into the Parquet file format and stored in HDFS.
 
-# Codes
+# Files
 The following scripts in this repository are used to establish the scalable streaming pipeline, ingest and transform the log data, and load it to HDFS:
 
 1. `producer.py` - script to read & inject data into a Kafka topic line by line
@@ -64,7 +64,6 @@ The following scripts in this repository are used to establish the scalable stre
 3. `transformation.py` - contains helper functions for wrangling Spark streaming dataframes
 
 # How to use
-
 1. Spin up HDFS
 
 ``` sh
@@ -85,3 +84,5 @@ spark-submit --packages org.apache.spark:spark-sql-kafka-0-10_2.12:3.4.0 consume
 ```
 # References:
 - [Scalable Log Analytics with Apache Spark — A Comprehensive Case-Study](https://github.com/XinyiWang-Jessica/log-streaming-analytics/assets/108918930/4c241e74-8600-4dc0-8926-4c38d6c9d517)
+- [NASA HTTP](https://ita.ee.lbl.gov/html/contrib/NASA-HTTP.html)
+
